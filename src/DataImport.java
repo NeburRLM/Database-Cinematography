@@ -57,6 +57,10 @@ public class DataImport {
         return false;
     }
 
+
+
+
+
     private void setNullableInt(PreparedStatement preparedStatement, int index, String value) throws SQLException {
         if (value != null && !value.isEmpty()) {
             preparedStatement.setInt(index, (int) Float.parseFloat(value));
@@ -121,8 +125,6 @@ public class DataImport {
                 preparedStatement.setString(1, id_title);
                 preparedStatement.setInt(2, id);
                 preparedStatement.executeUpdate();
-            }else{
-                System.out.println(id_title+" "+column);
             }
         }
 
@@ -254,14 +256,76 @@ public class DataImport {
     }
 
 
+    private boolean checkIfExists2(Connection connection, String tabla, String columnName, int columnValue, String id_title) {
+        String sqlCheck = "SELECT COUNT(*) FROM " + tabla + " WHERE " + columnName + " = ? AND id_title = ?";
 
+        try (PreparedStatement checkStatement = connection.prepareStatement(sqlCheck)) {
+            checkStatement.setInt(1, columnValue);
+            checkStatement.setString(2, id_title);
+            try (ResultSet resultSet = checkStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    int count = resultSet.getInt(1);
+                    return count > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public  void insertNMPerson(Connection dbc, String table, String column, String column2, int value, String table2, String id_title, int charactId, String role) throws SQLException {
+
+        String sql = "INSERT INTO " + table + " ("+column+", "+column2+") VALUES (?, ?)";
+        PreparedStatement preparedStatement= dbc.prepareStatement(sql);
+
+        if(!checkIfExists2(dbc,table, column, value, id_title)) {
+            preparedStatement.setInt(1, value);
+            preparedStatement.setString(2, id_title);
+            preparedStatement.executeUpdate();
+        }
+        sql= "SELECT id_info FROM "+table+" WHERE id_title = ? AND id_person = ?";
+        preparedStatement= dbc.prepareStatement(sql);
+        preparedStatement.setString(1, id_title);
+        preparedStatement.setInt(2, value);
+        int id=0;
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+            resultSet.next();
+            id = resultSet.getInt(1);
+        }
+        sql = "SELECT COUNT(*) FROM " + table2 + " WHERE id_info = ? AND id_character = ?";
+        preparedStatement= dbc.prepareStatement(sql);
+        preparedStatement.setInt(1,id);
+        preparedStatement.setInt(2, charactId);
+
+        try (ResultSet resultSet2 = preparedStatement.executeQuery()) {
+
+            resultSet2.next();
+            int id2 = resultSet2.getInt(1);
+            if (id2 == 0) {
+                sql = "INSERT INTO " + table2 + " (id_info, id_character, role) VALUES (?, ?, ?)";
+                preparedStatement= dbc.prepareStatement(sql);
+                preparedStatement.setInt(1,id);
+                preparedStatement.setInt(2, charactId);
+                preparedStatement.setString(3, role);
+                preparedStatement.executeUpdate();
+
+            }
+        }
+
+
+    }
+
+
+    //19066
     public void control_loop2(CSVRecord csvRecord, Connection dbc, String fit) throws SQLException {
         String sql = "INSERT INTO person (id_person, name) VALUES (?, ?)";
         String sql2 = "INSERT INTO charact (charact) VALUES (?)";
+        String sql3 = "INSERT INTO info_persons (id_person, id_title) VALUES (?, ?)";
         PreparedStatement preparedStatement;
 
         int idPerson = Integer.parseInt(csvRecord.get(0));
-        System.out.println(idPerson);
+        //System.out.println(idPerson);
         if (isUniqueIdUniquePerson(dbc, idPerson)) {
             preparedStatement = dbc.prepareStatement(sql);
             preparedStatement.setInt(1, idPerson);
@@ -272,12 +336,29 @@ public class DataImport {
         }
 
         String charact = csvRecord.get(3);
-        System.out.println("Character from CSV: " + charact);
-        if (isUniqueIdUniqueCharacter(dbc, String.valueOf(charact))) {
-            preparedStatement = dbc.prepareStatement(sql2);
-            preparedStatement.setString(1, charact);
-            preparedStatement.executeUpdate();
+        String[] partes = charact.split("/");
+        String idTitle = csvRecord.get(1);
+        String role = csvRecord.get(4);
+        for (int i =0; i<partes.length; i++){
+            if (isUniqueIdUniqueCharacter(dbc, String.valueOf(partes[i]))) {
+                preparedStatement = dbc.prepareStatement(sql2);
+                preparedStatement.setString(1, partes[i]);
+                preparedStatement.executeUpdate();
+
+                String sql4 = "SELECT id_character FROM charact WHERE charact = ?";
+                PreparedStatement statement2 = dbc.prepareStatement(sql4);
+                statement2.setString(1, partes[i]);
+                int idInfo = 0;
+                try (ResultSet resultSet = statement2.executeQuery()) {
+                    resultSet.next();
+                    idInfo = resultSet.getInt(1);
+                }
+                insertNMPerson(dbc, "info_persons", "id_person", "id_title", idPerson, "role", idTitle, idInfo, role);
+            }
         }
+
+
+
     }
 
 
@@ -350,34 +431,12 @@ public class DataImport {
     public static void main(String[] args) {
         DataImport db = new DataImport();
         Connection dbc = db.getConnection();
-        String stream[]={"Amazon_Prime", "Disney_Plus", "HBOMax","Netflix","ParamountTV","Rakuten_ViKi"};
+        String[] stream ={"Amazon_Prime", "Disney_Plus", "HBOMax","Netflix","ParamountTV","Rakuten_ViKi"};
         for(String fit: stream) {
             System.out.println(fit);
             //db.insertData2(dbc, fit);
             db.insertData(dbc, fit);
         }
-        // Insertar datos para Titles y Credits de cada proveedor
-       /* db.insertData("Amazon_Prime", "Titles", "resources/Dataset/Amazon_Prime_Titles.csv");
-        db.insertData("Amazon_Prime", "Credits", "resources/Dataset/Amazon_Prime_Credits.csv");
-
-        db.insertData("Disney_Plus", "Titles", "resources/Dataset/Disney_Plus_Titles.csv");
-        db.insertData("Disney_Plus", "Credits", "resources/Dataset/Disney_Plus_Credits.csv");
-
-        db.insertData("HBOMax", "Titles", "resources/Dataset/HBOMax_Titles.csv");
-        db.insertData("HBOMax", "Credits", "resources/Dataset/HBOMax_Credits.csv");
-
-        db.insertData("HuluTV", "Titles", "resources/Dataset/HuluTV_Titles.csv");
-        db.insertData("HuluTV", "Credits", "resources/Dataset/HuluTV_Credits.csv");
-
-        db.insertData("Netflix", "Titles", "resources/Dataset/Netflix_Titles.csv");
-        db.insertData("Netflix", "Credits", "resources/Dataset/Netflix_Credits.csv");
-
-        db.insertData("ParamountTV", "Titles", "resources/Dataset/ParamountTV_Titles.csv");
-        db.insertData("ParamountTV", "Credits", "resources/Dataset/ParamountTV_Credits.csv");
-
-        db.insertData("Rakuten_Viki", "Titles", "resources/Dataset/Rakuten_Viki_Titles.csv");
-        db.insertData("Rakuten_Viki", "Credits", "resources/Dataset/Rakuten_Viki_Credits.csv");
-        */
         db.close();
     }
 }
