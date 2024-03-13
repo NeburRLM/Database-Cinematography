@@ -1,8 +1,6 @@
-import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.sql.*;
-import java.util.Scanner;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -152,25 +150,13 @@ public class DataImport {
 
              setNullableInt(preparedStatement, 5, value);
 
-             /*value = csvRecord.get(5);
-             preparedStatement.setString(6, value);
-             */
+
              value = csvRecord.get(6);
              setNullableInt(preparedStatement, 6, value);
 
-             /*value = csvRecord.get(7);
-             preparedStatement.setString(8, value);
-
-             value = csvRecord.get(8);
-             preparedStatement.setString(9, value);
-             */
              value = csvRecord.get(9);
              setNullableInt(preparedStatement, 7, value);
-             /*
-             value = csvRecord.get(10);
-             setNullableString(preparedStatement, 11, value);
 
-              */
              value = csvRecord.get(11);
              setNullableFloat(preparedStatement, 8, value);
              value = csvRecord.get(12);
@@ -227,6 +213,13 @@ public class DataImport {
             for (String gen : genArray) {
                 // Eliminar comillas simples al principio y al final de cada elemento
                 gen = gen.replaceAll("^\\s*'(.*)'\\s*$", "$1");
+                if (gen.equalsIgnoreCase("United States of America")){
+                    gen="USA";
+                }
+                if (gen.equalsIgnoreCase("Lebanon")){
+                    gen="LB";
+                }
+
                 insertarNM(dbc, "country", "country", gen, "title_country", id_title);
             }
         }
